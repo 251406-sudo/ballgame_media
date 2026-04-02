@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dino Run Clone</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="game-wrapper">
+        <h1>미니 공룡 달리기</h1>
+
+        <div class="ui-bar">
+            <div class="score-box">점수 <span id="score">0</span></div>
+            <div class="score-box">최고 점수 <span id="highScore">0</span></div>
+        </div>
+
+        <div class="canvas-wrap">
+            <div id="message">Space를 눌러 시작하고 점프하세요</div>
+            <canvas id="gameCanvas" width="900" height="260"></canvas>
+        </div>
+
+        <p class="guide">스페이스바 ↑ 점프 / 게임 오버 후 다시 스페이스바로 재시작</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const scoreEl = document.getElementById("score");
+        const highScoreEl = document.getElementById("highScore");
+        const messageEl = document.getElementById("message");
+
+        const GROUND_Y = 210;
+        const GRAVITY = 0.75;
+        const JUMP_FORCE = 14;
+
+        let highScore = Number(localStorage.getItem("dinoHighScore") || 0);
+        highScoreEl.textContent = highScore;
+
+        let gameStarted = false;
+        let gameOver = false;
+        let score = 0;
+        let speed = 6;
+        let frame = 0;
+        let spawnTimer = 0;
+        let groundOffset = 0;
+
+        const dino = {
+            x: 70,
+            y: GROUND_Y - 48,
+            width: 44,
+            height: 48,
+            dy: 0,
+            grounded: true,
+            legFrame: 0
+        };
+
+        const obstacles = [];
+        const clouds = [
+            { x: 130, y: 55, w: 46, h: 16, speed: 0.6 },
+            { x: 380, y: 35, w: 56, h: 18, speed: 0.4 },
+            { x: 700, y: 65, w: 52, h: 16, speed: 0.5 }
+        ];
+
+        function resetGame() {
+            gameStarted = true;
+            gameOver = false;
+            score = 0;
+            speed = 6;
+            frame = 0;
+            spawnTimer = 0;
+            groundOffset = 0;
+            obstacles.length = 0;
+
+            dino.y = GROUND_Y - dino.height;
+            dino.dy = 0;
+            dino.grounded = true;
+
+            scoreEl.textContent = "0";
+            messageEl.style.display = "none";
+        }
+
+        function jump() {
+            if (dino.grounded && !gameOver && gameStarted) {
+                dino.dy = -JUMP_FORCE;
+                dino.grounded = false;
+            }
+        }
+
+        function spawnObstacle() {
+            const roll = Math.random();
+
+            // 선인장
+            if (roll < 0.72) {
+                const type = Math.random();
+                if (type < 0.34) {
+                    obstacles.push({
+                        type: "cactus",
+                        x: canvas.width + 20,
+                        y: GROUND_Y - 34,
+                        width: 20,
+                        height: 34
+                    });
+                } else if (type < 0.67) {
+                    obstacles.push({
+                        type: "cactus",
+                        x: canvas.width + 20,
+                        y: GROUND_Y - 46,
+                        width: 24,
+                        height: 46
+                    });
+                } else {
+                    obstacles.push({
+                        type: "cactus",
+                        x: canvas.width + 20,
+                        y: GROUND_Y - 36,
+                        width: 42,
+                        height: 36
+                    });
+                }
+            } else {
+                // 새 장애물
+                const birdHeights = [GROUND_Y - 70, GROUND_Y - 95, GROUND_Y - 120];
+                obstacles.push({
+                    type: "bird",
+                    x: canvas.width + 20,
+                    y: birdHeights[Math.floor(Math.random() * birdHeights.length)],
+                    width: 34,
+                    height: 24,
+                    flap: 0
+                });
+            }
+        }
+
+        function updateDino() {
+            dino.dy += GRAVITY;
+            dino.y += dino.dy;
+
+            if (dino.y + dino.height >= GROUND_Y) {
+                dino.y = GROUND_Y - dino.height;
+                dino.dy = 0;
+                dino.grounded = true;
+            }
+
+            if (dino.grounded) {
+                dino.legFrame = Math.floor(frame / 6) % 2;
+            }
+        }
+
+        function updateObstacles() {
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.x -= speed;
+
+                if (obs.type === "bird") {
+                    obs.flap += 1;
+                }
+
+                if (isColliding(dino, obs)) {
+                    endGame();
+                }
+
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateClouds() {
+            for (const cloud of clouds) {
+                cloud.x -= cloud.speed + speed * 0.08;
+                if (cloud.x + cloud.w < 0) {
+                    cloud.x = canvas.width + Math.random() * 120;
+                    cloud.y = 25 + Math.random() * 60;
+                }
+            }
+        }
+
+        function updateScore() {
+            score += 0.12;
+            scoreEl.textContent = Math.floor(score);
+
+            if (Math.floor(score) > highScore) {
+                highScore = Math.floor(score);
+                highScoreEl.textContent = highScore;
+                localStorage.setItem("dinoHighScore", highScore);
+            }
+
+            speed = 6 + Math.floor(score / 120) * 0.45;
+        }
+
+        function isColliding(a, b) {
+            const padX = 5;
+            const padY = 4;
+
+            return (
+                a.x + padX < b.x + b.width &&
+                a.x + a.width - padX > b.x &&
+                a.y + padY < b.y + b.height &&
+                a.y + a.height - padY > b.y
+            );
+        }
+
+        function endGame() {
+            gameOver = true;
+            messageEl.innerHTML = "게임 오버<br>Space를 눌러 다시 시작";
+            messageEl.style.display = "flex";
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 하늘
+            const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grad.addColorStop(0, "#fffdf2");
+            grad.addColorStop(1, "#f6efda");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawClouds();
+
+            // 바닥선
+            ctx.strokeStyle = "#5b5b5b";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, GROUND_Y);
+            ctx.lineTo(canvas.width, GROUND_Y);
+            ctx.stroke();
+
+            // 바닥 점선/돌 효과
+            groundOffset -= speed;
+            if (groundOffset < -40) groundOffset = 0;
+
+            ctx.fillStyle = "#8d8d8d";
+            for (let i = 0; i < 40; i++) {
+                const x = i * 40 + groundOffset;
+                const w = 14 + (i % 3) * 4;
+                const h = i % 2 === 0 ? 3 : 2;
+                ctx.fillRect(x, GROUND_Y + 12 + (i % 2) * 4, w, h);
+            }
+        }
+
+        function drawClouds() {
+            ctx.fillStyle = "#ffffff";
+
+            for (const cloud of clouds) {
+                drawCloud(cloud.x, cloud.y, cloud.w, cloud.h);
+            }
+        }
+
+        function drawCloud(x, y, w, h) {
+            ctx.beginPath();
+            ctx.arc(x + 10, y + 10, 10, 0, Math.PI * 2);
+            ctx.arc(x + 22, y + 8, 12, 0, Math.PI * 2);
+            ctx.arc(x + 36, y + 10, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillRect(x + 10, y + 8, 26, 12);
+        }
+
+        function drawDino() {
+            const x = dino.x;
+            const y = dino.y;
+
+            ctx.fillStyle = "#3b3b3b";
+
+            // 몸통
+            ctx.fillRect(x + 8, y + 12, 24, 24);
+
+            // 머리
+            ctx.fillRect(x + 24, y, 18, 18);
+
+            // 꼬리
+            ctx.fillRect(x, y + 22, 10, 6);
+
+            // 목
+            ctx.fillRect(x + 20, y + 8, 8, 10);
+
+            // 팔
+            ctx.fillRect(x + 21, y + 20, 5, 7);
+
+            // 눈
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(x + 34, y + 4, 3, 3);
+
+            ctx.fillStyle = "#3b3b3b";
+
+            if (!dino.grounded) {
+                // 점프 중 다리
+                ctx.fillRect(x + 10, y + 36, 6, 12);
+                ctx.fillRect(x + 22, y + 36, 6, 12);
+            } else {
+                // 달리기 애니메이션
+                if (dino.legFrame === 0) {
+                    ctx.fillRect(x + 10, y + 36, 6, 12);
+                    ctx.fillRect(x + 24, y + 34, 6, 14);
+                } else {
+                    ctx.fillRect(x + 10, y + 34, 6, 14);
+                    ctx.fillRect(x + 24, y + 36, 6, 12);
+                }
+            }
+        }
+
+        function drawCactus(obs) {
+            ctx.fillStyle = "#2f8f46";
+
+            // 몸통
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+
+            // 가지
+            if (obs.width <= 24) {
+                ctx.fillRect(obs.x - 6, obs.y + 10, 6, 12);
+                ctx.fillRect(obs.x + obs.width, obs.y + 14, 6, 14);
+            } else {
+                ctx.fillRect(obs.x + 6, obs.y + 8, 6, 10);
+                ctx.fillRect(obs.x + 12, obs.y + 3, 6, 15);
+                ctx.fillRect(obs.x + 24, obs.y + 10, 6, 10);
+                ctx.fillRect(obs.x + 30, obs.y + 5, 6, 15);
+            }
+        }
+
+        function drawBird(obs) {
+            const flapUp = Math.floor(obs.flap / 6) % 2 === 0;
+
+            ctx.fillStyle = "#4c4c4c";
+
+            // 몸
+            ctx.fillRect(obs.x + 8, obs.y + 8, 16, 10);
+
+            // 머리
+            ctx.fillRect(obs.x + 22, obs.y + 6, 8, 8);
+
+            // 부리
+            ctx.fillRect(obs.x + 30, obs.y + 9, 4, 2);
+
+            // 날개
+            if (flapUp) {
+                ctx.fillRect(obs.x + 10, obs.y + 2, 10, 6);
+                ctx.fillRect(obs.x + 6, obs.y + 8, 8, 4);
+            } else {
+                ctx.fillRect(obs.x + 10, obs.y + 14, 10, 6);
+                ctx.fillRect(obs.x + 6, obs.y + 12, 8, 4);
+            }
+        }
+
+        function drawObstacles() {
+            for (const obs of obstacles) {
+                if (obs.type === "cactus") drawCactus(obs);
+                else drawBird(obs);
+            }
+        }
+
+        function drawStartOrGameOverOverlay() {
+            if (!gameStarted || gameOver) {
+                ctx.fillStyle = "rgba(255,255,255,0.05)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function update() {
+            if (!gameStarted || gameOver) return;
+
+            frame++;
+            spawnTimer++;
+
+            updateDino();
+            updateObstacles();
+            updateClouds();
+            updateScore();
+
+            const spawnGap = Math.max(55, 95 - Math.floor(score / 50));
+            if (spawnTimer > spawnGap) {
+                spawnTimer = 0;
+                if (Math.random() < 0.7) {
+                    spawnObstacle();
+                }
+            }
+        }
+
+        function render() {
+            drawBackground();
+            drawDino();
+            drawObstacles();
+            drawStartOrGameOverOverlay();
+        }
+
+        function loop() {
+            update();
+            render();
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space") {
+                e.preventDefault();
+
+                if (!gameStarted) {
+                    resetGame();
+                    return;
+                }
+
+                if (gameOver) {
+                    resetGame();
+                    return;
+                }
+
+                jump();
+            }
+        });
+
+        render();
+        loop();
+    </script>
+</body>
+</html>
