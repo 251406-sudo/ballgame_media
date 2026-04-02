@@ -1,0 +1,70 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f8f4e3; /* 아이보리색 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.game-container {
+  text-align: center;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.info {
+  font-size: 20px;
+  margin-bottom: 15px;
+  color: #222;
+}
+
+#game-area {
+  position: relative;
+  width: 600px;
+  height: 400px;
+  background-color: #fffdf5;
+  border: 2px solid #d8d2c2;
+  border-radius: 12px;
+  margin: 0 auto 20px;
+  overflow: hidden;
+}
+
+#ball {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background-color: #2f6df6; /* 파란 공 */
+  border-radius: 50%;
+  display: none;
+  cursor: pointer;
+}
+
+#message {
+  position: absolute;
+  width: 100%;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  color: #555;
+  pointer-events: none;
+}
+
+#start-btn {
+  padding: 12px 24px;
+  font-size: 18px;
+  background-color: #2f6df6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#start-btn:hover {
+  background-color: #1f56cc;
+}

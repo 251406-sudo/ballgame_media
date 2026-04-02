@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>미니 타겟 게임</title>
+  <link rel="stylesheet" href="system.css" />
+</head>
+<body>
+  <div class="game-container">
+    <h1>미니 타겟 게임</h1>
+    <div class="info">
+      <p>점수: <span id="score">0</span></p>
+      <p>남은 시간: <span id="time">10</span>초</p>
+    </div>
+
+    <div id="game-area">
+      <div id="ball"></div>
+      <div id="message">공을 클릭해서 점수를 올리세요!</div>
+    </div>
+
+    <button id="start-btn">게임 시작</button>
+  </div>
+
+  <script>
+    const ball = document.getElementById("ball");
+    const scoreDisplay = document.getElementById("score");
+    const timeDisplay = document.getElementById("time");
+    const startBtn = document.getElementById("start-btn");
+    const message = document.getElementById("message");
+    const gameArea = document.getElementById("game-area");
+
+    let score = 0;
+    let timeLeft = 10;
+    let timer;
+    let gameRunning = false;
+
+    function moveBall() {
+      const areaWidth = gameArea.clientWidth - ball.clientWidth;
+      const areaHeight = gameArea.clientHeight - ball.clientHeight;
+
+      const randomX = Math.random() * areaWidth;
+      const randomY = Math.random() * areaHeight;
+
+      ball.style.left = `${randomX}px`;
+      ball.style.top = `${randomY}px`;
+    }
+
+    ball.addEventListener("click", () => {
+      if (!gameRunning) return;
+      score++;
+      scoreDisplay.textContent = score;
+      moveBall();
+    });
+
+    startBtn.addEventListener("click", () => {
+      if (gameRunning) return;
+
+      score = 0;
+      timeLeft = 10;
+      gameRunning = true;
+
+      scoreDisplay.textContent = score;
+      timeDisplay.textContent = timeLeft;
+      message.textContent = "게임 진행 중!";
+      ball.style.display = "block";
+      moveBall();
+
+      timer = setInterval(() => {
+        timeLeft--;
+        timeDisplay.textContent = timeLeft;
+
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          gameRunning = false;
+          ball.style.display = "none";
+          message.textContent = `게임 종료! 최종 점수: ${score}`;
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
